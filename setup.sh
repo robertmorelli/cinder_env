@@ -27,4 +27,4 @@ sed "s/__IMAGE_NAME__/$IMAGE_NAME/g" "$SUBMODULE_DIR/shims/pip" > "$BIN/pip"
 chmod +x "$BIN/pip"
 
 echo "==> Done. Activate with:"
-echo "    source $SUBMODULE_DIR/activate"
+echo "    source $SUBMODULE_DIR/bin/activate"
