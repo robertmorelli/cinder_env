@@ -37,11 +37,14 @@ func errExit(kind, msg, stdout string, code int) {
 	os.Exit(code)
 }
 
-func parseArgs(args []string) (configFile string, passthrough []string) {
+func parseArgs(args []string) (configFile string, skipTypecheck bool, passthrough []string) {
 	for _, a := range args {
-		if strings.HasPrefix(a, "--config=") {
+		switch {
+		case strings.HasPrefix(a, "--config="):
 			configFile = strings.TrimPrefix(a, "--config=")
-		} else {
+		case a == "--skip-typecheck":
+			skipTypecheck = true
+		default:
 			passthrough = append(passthrough, a)
 		}
 	}
@@ -154,7 +157,7 @@ func execCapture(ctx context.Context, cli *client.Client, cmd []string) (stdout,
 func main() {
 	ctx := context.Background()
 
-	configFile, passthrough := parseArgs(os.Args[1:])
+	configFile, skipTypecheck, passthrough := parseArgs(os.Args[1:])
 	jitFlags := resolveJitFlags(configFile)
 
 	cli, err := client.NewClientWithOpts(dockerHost(), client.WithAPIVersionNegotiation())
@@ -168,10 +171,12 @@ func main() {
 
 	execCapture(ctx, cli, []string{"/bin/bash", "-c", "rm -rf /scratch && mkdir /scratch"})
 
-	tcCmd := append([]string{"python", "-m", "cinderx.compiler", "--static", "-c"}, passthrough...)
-	tcOut, tcErr, tcCode := execCapture(ctx, cli, tcCmd)
-	if tcCode != 0 {
-		errExit("typecheck error", tcOut+tcErr, "", 1)
+	if !skipTypecheck {
+		tcCmd := append([]string{"python", "-m", "cinderx.compiler", "--static", "-c"}, passthrough...)
+		tcOut, tcErr, tcCode := execCapture(ctx, cli, tcCmd)
+		if tcCode != 0 {
+			errExit("typecheck error", tcOut+tcErr, "", tcCode)
+		}
 	}
 
 	runCmd := append(append([]string{"python"}, jitFlags...), passthrough...)

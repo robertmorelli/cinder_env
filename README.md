@@ -19,6 +19,7 @@ sh cinder_env/setup.sh  # takes ~10 min on first run, cached after
 ```bash
 source cinder_env/bin/activate
 python script.py
+python --skip-typecheck script.py
 python --config=cinder.json script.py
 pip install somepackage
 deactivate
