@@ -1,30 +1,32 @@
 # cinder-env
 
-Pyenv shim for running Cinder (Meta's CPython fork) via Docker.
+Shim for running Cinder (Meta's CPython fork) via Docker.
 
 ## Prerequisites
 
 - Docker
-- pyenv
+- Go (to compile the shim)
 
 ## Setup
 
 ```bash
-./cinder_env/setup.sh
-pyenv local cinder
+git submodule add https://github.com/robertmorelli/cinder_env
+sh cinder_env/setup.sh  # takes ~10 min on first run, cached after
 ```
 
 ## Usage
 
 ```bash
+source cinder_env/bin/activate
 python script.py
 python --config=cinder.json script.py
 pip install somepackage
+deactivate
 ```
 
 ## How it works
 
-Every `python` invocation runs inside a persistent Cinder container with your current directory mounted at `/app`. Before running, the entrypoint always typechecks the file with `cinderx.compiler --static`. If that passes, it runs with the configured JIT flags. A fresh `/scratch` directory is created inside the container on every invocation.
+Every `python` invocation runs inside a persistent Cinder container with your current directory mounted at `/app`. Before running, the file is typechecked with `cinderx.compiler --static`. If that passes, it runs with the configured JIT flags. A fresh `/scratch` directory is created inside the container on every invocation.
 
 ## Structured errors
 
@@ -35,8 +37,6 @@ All errors are written to stderr as a tuple:
 ("runtime error", "<stderr>", "<stdout>")
 ("docker error", "<message>", "")
 ```
-
-`docker error` is emitted by the shim if the Docker daemon is not running.
 
 ## Config file
 
@@ -58,11 +58,17 @@ Pass `--config=<file.json>` to control JIT flags. Without a config, all JIT flag
 cinder_env/
 ├── Dockerfile
 ├── setup.sh
-├── entrypoint.sh
-├── jitlist_main.txt
-├── shims/
+├── bin/
+│   ├── activate
 │   ├── python
+│   ├── python3
 │   └── pip
+├── shim/
+│   └── main.go
+├── shims/
+│   └── pip
+├── jitlist_main.txt
+├── entrypoint.sh
 └── scripts/
     └── parse_config.py
 ```

@@ -176,7 +176,7 @@ func main() {
 
 	runCmd := append(append([]string{"python"}, jitFlags...), passthrough...)
 	runOut, runErr, exitCode := execCapture(ctx, cli, runCmd)
-	if exitCode != 0 || runErr != "" {
+	if exitCode != 0 {
 		errExit("runtime error", runErr, runOut, exitCode)
 	}
 	fmt.Print(runOut)
