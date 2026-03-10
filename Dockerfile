@@ -42,7 +42,6 @@ RUN ./configure \
 WORKDIR /cinder/cinderx
 RUN ./build.sh --build-root /cinder --python-bin /cinder/python --output-dir /cinder
 
-RUN ls -la /cinder/*.so || echo "Extension files:" && find /cinder -name "_cinderx*.so" -o -name "_static*.so" 2>/dev/null | head -20
 
 ENV PATH="/cinder:${PATH}"
 ENV PYTHONPATH="/cinder"

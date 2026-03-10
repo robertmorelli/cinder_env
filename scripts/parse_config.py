@@ -7,7 +7,8 @@ DEFAULT_JIT_LIST = "/jitlist_main.txt"
 if len(sys.argv) < 2:
     cfg = {}
 else:
-    cfg = json.load(open(sys.argv[1]))
+    with open(sys.argv[1]) as f:
+        cfg = json.load(f)
 
 flags = cfg.get("flags", DEFAULT_FLAGS)
 jit_list = cfg.get("jit_list", DEFAULT_JIT_LIST)
