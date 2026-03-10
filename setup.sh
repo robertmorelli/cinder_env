@@ -6,6 +6,9 @@ IMAGE_NAME="cinder-env"
 PYENV_VERSION="cinder"
 PYENV_BIN="$HOME/.pyenv/versions/$PYENV_VERSION/bin"
 
+echo "==> Initializing submodules..."
+git -C "$SUBMODULE_DIR" submodule update --init
+
 echo "==> Building Cinder image..."
 docker build --platform linux/amd64 -t "$IMAGE_NAME" "$SUBMODULE_DIR"
 

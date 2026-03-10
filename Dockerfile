@@ -44,7 +44,7 @@ RUN ./build.sh --build-root /cinder --python-bin /cinder/python --output-dir /ci
 
 
 ENV PATH="/cinder:${PATH}"
-ENV PYTHONPATH="/cinder"
+ENV PYTHONPATH="/cinder:/cinder/cinderx/PythonLib"
 
 # DEV TOOLS (stable, rarely change)
 WORKDIR /root

@@ -1,3 +1,4 @@
 [submodule "cinder"]
 	path = cinder
 	url = https://github.com/facebookincubator/cinder
+	branch = cinder/3.10
