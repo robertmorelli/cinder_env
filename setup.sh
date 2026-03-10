@@ -23,7 +23,14 @@ go mod tidy
 go build -ldflags "-X main.imageName=$IMAGE_NAME" -o "$BIN/python" .
 ln -sf python "$BIN/python3"
 
-sed "s/__IMAGE_NAME__/$IMAGE_NAME/g" "$SUBMODULE_DIR/shims/pip" > "$BIN/pip"
+cat > "$BIN/pip" << EOF
+#!/bin/bash
+if ! docker info > /dev/null 2>&1; then
+  echo '("docker error", "Docker daemon is not running", "")' >&2
+  exit 1
+fi
+exec docker run --rm -i -v "\$(pwd):/app" -w /app $IMAGE_NAME pip "\$@"
+EOF
 chmod +x "$BIN/pip"
 
 echo "==> Done. Activate with:"
