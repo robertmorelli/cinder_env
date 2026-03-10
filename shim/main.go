@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/docker/docker/api/types/container"
@@ -69,6 +71,19 @@ func resolveJitFlags(configFile string) []string {
 		jitList = "/jitlist_main.txt"
 	}
 	return append(flags, "-X", "jit-list-file="+jitList)
+}
+
+func dockerHost() client.Opt {
+	if host := os.Getenv("DOCKER_HOST"); host != "" {
+		return client.WithHost(host)
+	}
+	if runtime.GOOS == "darwin" {
+		macSocket := filepath.Join(os.Getenv("HOME"), ".docker/run/docker.sock")
+		if _, err := os.Stat(macSocket); err == nil {
+			return client.WithHost("unix://" + macSocket)
+		}
+	}
+	return client.WithHost(client.DefaultDockerHost)
 }
 
 func isRunningWithMount(ctx context.Context, cli *client.Client, cwd string) bool {
@@ -142,7 +157,7 @@ func main() {
 	configFile, passthrough := parseArgs(os.Args[1:])
 	jitFlags := resolveJitFlags(configFile)
 
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	cli, err := client.NewClientWithOpts(dockerHost(), client.WithAPIVersionNegotiation())
 	if err != nil {
 		errExit("docker error", "cannot connect to Docker: "+err.Error(), "", 1)
 	}
