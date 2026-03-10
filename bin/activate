@@ -15,7 +15,7 @@ deactivate() {
     hash -r 2>/dev/null
 }
 
-CINDER_ENV="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+CINDER_ENV="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")/.." && pwd)"
 export CINDER_ENV
 
 export _OLD_CINDER_PATH="$PATH"
