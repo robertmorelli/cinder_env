@@ -1,0 +1,31 @@
+#!/bin/bash
+if ! docker info > /dev/null 2>&1; then
+  echo '("docker error", "Docker daemon is not running", "")' >&2
+  exit 1
+fi
+
+CONTAINER_NAME="cinder-env-daemon"
+CURRENT_DIR="$(pwd)"
+
+# Check if container is running with the right mount
+RUNNING_DIR=$(docker inspect $CONTAINER_NAME --format '{{ range .Mounts }}{{ .Source }}{{ end }}' 2>/dev/null)
+
+if [ "$RUNNING_DIR" != "$CURRENT_DIR" ]; then
+  docker rm -f $CONTAINER_NAME > /dev/null 2>&1 || true
+  docker run -d \
+    --name $CONTAINER_NAME \
+    -v "$CURRENT_DIR:/app" \
+    -w /app \
+    __IMAGE_NAME__ \
+    sleep infinity > /dev/null
+fi
+
+# Nuke and recreate scratch dir
+docker exec $CONTAINER_NAME bash -c "rm -rf /scratch && mkdir /scratch"
+
+DOCKER_ARGS=(-i)
+if [ -t 0 ]; then
+  DOCKER_ARGS+=(-t)
+fi
+
+exec docker exec "${DOCKER_ARGS[@]}" $CONTAINER_NAME python "$@"
