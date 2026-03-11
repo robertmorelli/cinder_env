@@ -21,15 +21,11 @@ mkdir -p "$BIN"
 cd "$SUBMODULE_DIR/shim"
 go mod tidy
 go build -ldflags "-X main.imageName=$IMAGE_NAME" -o "$BIN/python" .
-rm -f "$BIN/python3"
 
-cat > "$BIN/pip" << EOF
+cat > "$BIN/pip" << 'EOF'
 #!/bin/bash
-if ! docker info > /dev/null 2>&1; then
-  echo '("docker error", "Docker daemon is not running", "")' >&2
-  exit 1
-fi
-exec docker run --rm -i -v "\$(pwd):/app" -w /app $IMAGE_NAME pip "\$@"
+echo "pip shim is currently unsupported in cinder-env." >&2
+exit 2
 EOF
 chmod +x "$BIN/pip"
 

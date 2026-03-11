@@ -17,6 +17,7 @@ import (
 
 // injected at build time: go build -ldflags "-X main.imageName=my-image"
 var imageName = "cinder-env"
+var structuredMode bool
 
 const daemonContainer = "cinder-env-daemon"
 
@@ -32,23 +33,85 @@ type cinderConfig struct {
 	JitList string   `json:"jit_list"`
 }
 
-func errExit(kind, msg, stdout string, code int) {
-	fmt.Fprintf(os.Stderr, "(%q, %q, %q)\n", kind, msg, stdout)
+type structuredResult struct {
+	Stdout string `json:"stdout"`
+	Stderr string `json:"stderr"`
+	Code   int    `json:"code"`
+	Error  string `json:"error,omitempty"`
+}
+
+func exitResult(stdout, stderr string, code int, errKind string) {
+	if structuredMode {
+		result := structuredResult{
+			Stdout: stdout,
+			Stderr: stderr,
+			Code:   code,
+		}
+		if errKind != "" {
+			result.Error = errKind
+		}
+		enc := json.NewEncoder(os.Stdout)
+		enc.SetEscapeHTML(false)
+		if err := enc.Encode(result); err != nil {
+			fmt.Fprintf(
+				os.Stdout,
+				`{"stdout":%q,"stderr":%q,"code":%d,"error":"structured encode failure"}`+"\n",
+				stdout,
+				stderr,
+				code,
+			)
+		}
+	} else {
+		if stdout != "" {
+			fmt.Fprint(os.Stdout, stdout)
+		}
+		if stderr != "" {
+			fmt.Fprint(os.Stderr, stderr)
+		}
+	}
 	os.Exit(code)
 }
 
-func parseArgs(args []string) (configFile string, skipTypecheck bool, passthrough []string) {
+func errExit(kind, msg string, code int) {
+	if structuredMode {
+		exitResult("", msg, code, kind)
+	}
+	if kind != "" {
+		fmt.Fprintf(os.Stderr, "%s: %s\n", kind, msg)
+	} else {
+		fmt.Fprintln(os.Stderr, msg)
+	}
+	os.Exit(code)
+}
+
+func parseArgs(args []string) (configFile string, skipTypecheck bool, structured bool, passthrough []string) {
 	for _, a := range args {
 		switch {
 		case strings.HasPrefix(a, "--config="):
 			configFile = strings.TrimPrefix(a, "--config=")
 		case a == "--skip-typecheck":
 			skipTypecheck = true
+		case a == "--structured":
+			structured = true
 		default:
 			passthrough = append(passthrough, a)
 		}
 	}
 	return
+}
+
+func typecheckPycPath(passthrough []string) string {
+	if len(passthrough) == 0 {
+		return ""
+	}
+	input := passthrough[0]
+	if strings.HasPrefix(input, "-") || input == "" {
+		return ""
+	}
+	if dot := strings.LastIndex(input, "."); dot != -1 {
+		return input[:dot] + ".pyc"
+	}
+	return input + ".pyc"
 }
 
 func resolveJitFlags(configFile string) []string {
@@ -57,13 +120,13 @@ func resolveJitFlags(configFile string) []string {
 	}
 	f, err := os.Open(configFile)
 	if err != nil {
-		errExit("docker error", "cannot open config: "+err.Error(), "", 1)
+		errExit("docker error", "cannot open config: "+err.Error(), 1)
 	}
 	defer f.Close()
 
 	var cfg cinderConfig
 	if err := json.NewDecoder(f).Decode(&cfg); err != nil {
-		errExit("docker error", "invalid config JSON: "+err.Error(), "", 1)
+		errExit("docker error", "invalid config JSON: "+err.Error(), 1)
 	}
 	flags := cfg.Flags
 	if len(flags) == 0 {
@@ -120,10 +183,10 @@ func ensureContainer(ctx context.Context, cli *client.Client, cwd string) {
 		nil, nil, daemonContainer,
 	)
 	if err != nil {
-		errExit("docker error", "container create: "+err.Error(), "", 1)
+		errExit("docker error", "container create: "+err.Error(), 1)
 	}
 	if err := cli.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
-		errExit("docker error", "container start: "+err.Error(), "", 1)
+		errExit("docker error", "container start: "+err.Error(), 1)
 	}
 }
 
@@ -135,21 +198,21 @@ func execCapture(ctx context.Context, cli *client.Client, cmd []string) (stdout,
 		WorkingDir:   "/app",
 	})
 	if err != nil {
-		errExit("docker error", "exec create: "+err.Error(), "", 1)
+		errExit("docker error", "exec create: "+err.Error(), 1)
 	}
 	resp, err := cli.ContainerExecAttach(ctx, exec.ID, container.ExecAttachOptions{})
 	if err != nil {
-		errExit("docker error", "exec attach: "+err.Error(), "", 1)
+		errExit("docker error", "exec attach: "+err.Error(), 1)
 	}
 	defer resp.Close()
 
 	var outBuf, errBuf bytes.Buffer
 	if _, err := stdcopy.StdCopy(&outBuf, &errBuf, resp.Reader); err != nil {
-		errExit("docker error", "read output: "+err.Error(), "", 1)
+		errExit("docker error", "read output: "+err.Error(), 1)
 	}
 	info, err := cli.ContainerExecInspect(ctx, exec.ID)
 	if err != nil {
-		errExit("docker error", "exec inspect: "+err.Error(), "", 1)
+		errExit("docker error", "exec inspect: "+err.Error(), 1)
 	}
 	return outBuf.String(), errBuf.String(), info.ExitCode
 }
@@ -157,12 +220,13 @@ func execCapture(ctx context.Context, cli *client.Client, cmd []string) (stdout,
 func main() {
 	ctx := context.Background()
 
-	configFile, skipTypecheck, passthrough := parseArgs(os.Args[1:])
+	configFile, skipTypecheck, structured, passthrough := parseArgs(os.Args[1:])
+	structuredMode = structured
 	jitFlags := resolveJitFlags(configFile)
 
 	cli, err := client.NewClientWithOpts(dockerHost(), client.WithAPIVersionNegotiation())
 	if err != nil {
-		errExit("docker error", "cannot connect to Docker: "+err.Error(), "", 1)
+		errExit("docker error", "cannot connect to Docker: "+err.Error(), 1)
 	}
 	defer cli.Close()
 
@@ -175,14 +239,23 @@ func main() {
 		tcCmd := append([]string{"python", "-m", "cinderx.compiler", "--static", "-c"}, passthrough...)
 		tcOut, tcErr, tcCode := execCapture(ctx, cli, tcCmd)
 		if tcCode != 0 {
-			errExit("typecheck error", tcOut+tcErr, "", tcCode)
+			exitResult(tcOut, tcErr, tcCode, "typecheck error")
+		}
+		if pycPath := typecheckPycPath(passthrough); pycPath != "" {
+			execCapture(ctx, cli, []string{
+				"python",
+				"-c",
+				"import os,sys; p=sys.argv[1];\ntry:\n os.remove(p)\nexcept FileNotFoundError:\n pass",
+				pycPath,
+			})
 		}
 	}
 
 	runCmd := append(append([]string{"python"}, jitFlags...), passthrough...)
 	runOut, runErr, exitCode := execCapture(ctx, cli, runCmd)
+	errKind := ""
 	if exitCode != 0 {
-		errExit("runtime error", runErr, runOut, exitCode)
+		errKind = "runtime error"
 	}
-	fmt.Print(runOut)
+	exitResult(runOut, runErr, exitCode, errKind)
 }
