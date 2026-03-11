@@ -12,7 +12,7 @@ Shim for running Cinder (Meta's CPython fork) via Docker.
 
 ```bash
 git submodule add https://github.com/robertmorelli/cinder_env
-sh cinder_env/setup.sh  # takes ~10 min on first run, cached after
+sh cinder_env/setup.sh  # takes ~30 min on first run, cached after
 ```
 
 ## Usage
@@ -56,9 +56,9 @@ Pass `--config=<file.json>` to control JIT flags. Without a config, all JIT flag
 
 ## Current limitations
 
-- Not concurrency-safe yet: all invocations share one daemon container name (`cinder-env-daemon`) and shared scratch lifecycle.
+- **IMPORTANT! not concurrent! all invocations share one daemon container name (`cinder-env-daemon`) and shared scratch lifecycle.**
 - `pip` shim is currently unsupported.
-- `linux/amd64` only.
+- interactive programs and programs that import files likely wont work
 
 ## File layout
 
