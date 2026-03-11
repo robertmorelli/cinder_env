@@ -21,6 +21,7 @@ mkdir -p "$BIN"
 cd "$SUBMODULE_DIR/shim"
 go mod tidy
 go build -ldflags "-X main.imageName=$IMAGE_NAME" -o "$BIN/python" .
+rm -f "$BIN/python3"
 
 cat > "$BIN/pip" << EOF
 #!/bin/bash
