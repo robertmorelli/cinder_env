@@ -12,8 +12,10 @@ Shim for running Cinder (Meta's CPython fork) via Docker.
 
 ```bash
 git submodule add https://github.com/robertmorelli/cinder_env
-sh cinder_env/setup.sh  # takes ~30 min on first run, cached after
+bash cinder_env/setup.sh  # takes ~30 min on first run, cached after
 ```
+
+On CloudLab, `docker` is often Podman-backed. `setup.sh` now detects that case, builds the image as `localhost/cinder-env:latest`, and points the shim at Podman's socket automatically.
 
 ## Usage
 

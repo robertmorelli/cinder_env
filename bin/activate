@@ -1,7 +1,15 @@
 # source this file — do not run it directly
-# usage: source cinder_env/activate
+# usage: source cinder_env/bin/activate
 
 deactivate() {
+    if [ -n "${_OLD_CINDER_DOCKER_HOST_STATE:-}" ]; then
+        if [ "$_OLD_CINDER_DOCKER_HOST_STATE" = "unset" ]; then
+            unset DOCKER_HOST
+        else
+            export DOCKER_HOST="$_OLD_CINDER_DOCKER_HOST_STATE"
+        fi
+        unset _OLD_CINDER_DOCKER_HOST_STATE
+    fi
     if [ -n "${_OLD_CINDER_PATH:-}" ]; then
         export PATH="$_OLD_CINDER_PATH"
         unset _OLD_CINDER_PATH
@@ -17,6 +25,26 @@ deactivate() {
 
 CINDER_ENV="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")/.." && pwd)"
 export CINDER_ENV
+
+if command -v docker >/dev/null 2>&1 && command -v podman >/dev/null 2>&1; then
+    if docker images >/dev/null 2>&1; then
+        if docker images 2>&1 | grep -qi "podman"; then
+            _cinder_podman_socket="$(podman info --format '{{.Host.RemoteSocket.Path}}' 2>/dev/null || true)"
+            if [ -n "$_cinder_podman_socket" ] && [ ! -S "$_cinder_podman_socket" ]; then
+                systemctl --user start podman.socket >/dev/null 2>&1 || true
+            fi
+            if [ -n "$_cinder_podman_socket" ] && [ -S "$_cinder_podman_socket" ]; then
+                if [ -n "${DOCKER_HOST:-}" ]; then
+                    export _OLD_CINDER_DOCKER_HOST_STATE="$DOCKER_HOST"
+                else
+                    export _OLD_CINDER_DOCKER_HOST_STATE="unset"
+                fi
+                export DOCKER_HOST="unix://$_cinder_podman_socket"
+            fi
+            unset _cinder_podman_socket
+        fi
+    fi
+fi
 
 export _OLD_CINDER_PATH="$PATH"
 export PATH="$CINDER_ENV/bin:$PATH"
