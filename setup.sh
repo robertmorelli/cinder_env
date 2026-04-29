@@ -56,7 +56,21 @@ echo "==> Building python shim..."
 mkdir -p "$BIN"
 cd "$SUBMODULE_DIR/shim"
 go mod tidy
-go build -ldflags "-X main.imageName=$IMAGE_NAME" -o "$BIN/python" .
+go build -ldflags "-X main.imageName=$IMAGE_NAME" -o "$BIN/python-shim" .
+
+if [[ -n "${DOCKER_HOST:-}" ]]; then
+  cat > "$BIN/python" << EOF
+#!/bin/bash
+export DOCKER_HOST="$DOCKER_HOST"
+exec "$BIN/python-shim" "\$@"
+EOF
+else
+  cat > "$BIN/python" << EOF
+#!/bin/bash
+exec "$BIN/python-shim" "\$@"
+EOF
+fi
+chmod +x "$BIN/python"
 
 cat > "$BIN/pip" << 'EOF'
 #!/bin/bash
