@@ -84,13 +84,15 @@ func errExit(kind, msg string, code int) {
 	os.Exit(code)
 }
 
-func parseArgs(args []string) (configFile string, skipTypecheck bool, structured bool, passthrough []string) {
+func parseArgs(args []string) (configFile string, skipTypecheck bool, typecheckOnly bool, structured bool, passthrough []string) {
 	for _, a := range args {
 		switch {
 		case strings.HasPrefix(a, "--config="):
 			configFile = strings.TrimPrefix(a, "--config=")
 		case a == "--skip-typecheck":
 			skipTypecheck = true
+		case a == "--typecheck-only":
+			typecheckOnly = true
 		case a == "--structured":
 			structured = true
 		default:
@@ -220,7 +222,7 @@ func execCapture(ctx context.Context, cli *client.Client, cmd []string) (stdout,
 func main() {
 	ctx := context.Background()
 
-	configFile, skipTypecheck, structured, passthrough := parseArgs(os.Args[1:])
+	configFile, skipTypecheck, typecheckOnly, structured, passthrough := parseArgs(os.Args[1:])
 	structuredMode = structured
 	jitFlags := resolveJitFlags(configFile)
 
@@ -249,6 +251,11 @@ func main() {
 				pycPath,
 			})
 		}
+		if typecheckOnly {
+			exitResult(tcOut, tcErr, 0, "")
+		}
+	} else if typecheckOnly {
+		errExit("argument error", "--typecheck-only cannot be combined with --skip-typecheck", 2)
 	}
 
 	runCmd := append(append([]string{"python"}, jitFlags...), passthrough...)

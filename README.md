@@ -23,6 +23,7 @@ On CloudLab, `docker` is often Podman-backed. `setup.sh` now detects that case, 
 source cinder_env/bin/activate
 python script.py
 python --skip-typecheck script.py
+python --typecheck-only script.py
 python --config=cinder.json script.py
 python --structured script.py
 deactivate
@@ -30,7 +31,7 @@ deactivate
 
 ## How it works
 
-Every `python` invocation runs inside a persistent Cinder container with your current directory mounted at `/app`. Before runtime, the shim runs `python -m cinderx.compiler --static -c` (unless `--skip-typecheck` is passed), then removes the generated `.pyc`. If that succeeds, it runs with the configured JIT flags. A fresh `/scratch` directory is created inside the container on every invocation.
+Every `python` invocation runs inside a persistent Cinder container with your current directory mounted at `/app`. Before runtime, the shim runs `python -m cinderx.compiler --static -c` (unless `--skip-typecheck` is passed), then removes the generated `.pyc`. If that succeeds, it runs with the configured JIT flags. `--typecheck-only` exits after the static compiler succeeds. A fresh `/scratch` directory is created inside the container on every invocation.
 
 ## Output modes
 
